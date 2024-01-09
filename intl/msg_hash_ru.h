@@ -9873,15 +9873,6 @@ MSG_HASH(
 /* RGUI: Settings > User Interface > Appearance */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_RGUI_FULLSCREEN_STRETCH,
-   "Во весь экран"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_RGUI_FULLSCREEN_STRETCH,
-   "Меню на весь экран."
-   )
-
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_RGUI_BACKGROUND_FILLER_THICKNESS_ENABLE,
    "Плотность фона"
    )

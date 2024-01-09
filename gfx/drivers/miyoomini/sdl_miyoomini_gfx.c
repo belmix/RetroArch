@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <SDL/SDL.h>
 #include <SDL/SDL_video.h>
@@ -64,10 +65,13 @@
 #define OSD_TEXT_LINES_MAX 3	/* 1 .. 7 */
 #define OSD_TEXT_LINE_LEN ((uint32_t)(RGUI_MENU_WIDTH / FONT_WIDTH_STRIDE)-1)
 #define OSD_TEXT_LEN_MAX (OSD_TEXT_LINE_LEN * OSD_TEXT_LINES_MAX)
+#define RGUI_MENU_STRETCH_FILE_PATH "/mnt/SDCARD/.tmp_update/config/RetroArch/.noMenuStretch"
+#define FB_DEVICE_FILE_PATH "/dev/fb0"
+#define NEW_RES_FILE_PATH "/tmp/new_res_available"
 
 uint32_t res_x, res_y;
+bool rgui_menu_stretch = true;
 SDL_Rect rgui_menu_dest_rect;
-bool previous_fullscreen_stretch;
 typedef struct sdl_miyoomini_video sdl_miyoomini_video_t;
 struct sdl_miyoomini_video
 {
@@ -786,9 +790,12 @@ static void *sdl_miyoomini_gfx_init(const video_info_t *video,
 
    sdl_miyoomini_set_cpugovernor(PERFORMANCE);
 
-   const char *fb_device = "/dev/fb0";
+   if (access(NEW_RES_FILE_PATH, F_OK) == 0) {
+      RARCH_LOG("[MI_GFX]: 560p available, changing resolution\n");
+      system("/mnt/SDCARD/.tmp_update/script/change_resolution.sh 752x560");
+   }
 
-    int fb = open(fb_device, O_RDWR);
+    int fb = open(FB_DEVICE_FILE_PATH, O_RDWR);
     if (fb == -1) {
         RARCH_ERR("Error opening framebuffer device");
         return NULL;
@@ -807,8 +814,12 @@ static void *sdl_miyoomini_gfx_init(const video_info_t *video,
 
    RARCH_LOG("[MI_GFX]: Resolution: %ux%u\n", res_x, res_y);
 
-   rgui_menu_dest_rect = (SDL_Rect){(res_x - RGUI_MENU_WIDTH * 2) / 2, (res_y - RGUI_MENU_HEIGHT * 2) / 2, RGUI_MENU_WIDTH * 2, RGUI_MENU_HEIGHT * 2};
+   if (access(RGUI_MENU_STRETCH_FILE_PATH, F_OK) == 0 || (res_x == 640 && res_y == 480)){
+      RARCH_LOG("[MI_GFX]: Menu stretch disabled\n");
+      rgui_menu_stretch = false;
+   }
 
+   rgui_menu_dest_rect = (SDL_Rect){(res_x - RGUI_MENU_WIDTH * 2) / 2, (res_y - RGUI_MENU_HEIGHT * 2) / 2, RGUI_MENU_WIDTH * 2, RGUI_MENU_HEIGHT * 2};
    /* Initialise graphics subsystem, if required */
    if (sdl_subsystem_flags == 0) {
       if (SDL_Init(SDL_INIT_VIDEO) < 0) return NULL;
@@ -932,17 +943,7 @@ static bool sdl_miyoomini_gfx_frame(void *data, const void *frame,
       /* HW Blit GFX surface to Framebuffer and Flip */
       GFX_UpdateRect(vid->screen, vid->video_x, vid->video_y, vid->video_w, vid->video_h);
    } else {
-      settings_t *settings       = config_get_ptr();
-      if (unlikely(!settings))
-         SDL_SoftStretch(vid->menuscreen_rgui, NULL, vid->menuscreen, &rgui_menu_dest_rect);
-      else{
-         if (unlikely(settings->bools.menu_rgui_fullscreen_stretch != previous_fullscreen_stretch)) {
-            previous_fullscreen_stretch = settings->bools.menu_rgui_fullscreen_stretch;
-            /* clear screen to remove ghost image of menu */
-            GFX_FillRect(vid->menuscreen, NULL, 0);
-         }
-         SDL_SoftStretch(vid->menuscreen_rgui, NULL, vid->menuscreen, settings->bools.menu_rgui_fullscreen_stretch ? NULL : &rgui_menu_dest_rect);
-      }
+      SDL_SoftStretch(vid->menuscreen_rgui, NULL, vid->menuscreen, rgui_menu_stretch ? NULL : &rgui_menu_dest_rect);
       stOpt.eRotate = E_MI_GFX_ROTATE_180;
       GFX_Flip(vid->menuscreen);
       stOpt.eRotate = vid->rotate;
